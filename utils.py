@@ -121,8 +121,5 @@ def CycleGAN_tensorboard(writer, epoch, fake_A, fake_B, lossG, lossD):
     fake_A_grid = torchvision.utils.make_grid(fake_A)
     fake_B_grid = torchvision.utils.make_grid(fake_B)
 
-    print(fake_A_grid)
-    print(Denormalize(fake_A_grid))
-
     writer.add_image('Fake A', Denormalize(fake_A_grid), global_step=epoch+1)
     writer.add_image('Fake B', Denormalize(fake_B_grid), global_step=epoch+1)

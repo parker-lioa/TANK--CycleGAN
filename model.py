@@ -97,6 +97,7 @@ def define_G(in_dim, out_dim, conv_dim, norm_type):
 
 
 def define_D(in_dim, conv_dim, norm_type):
+    
     net = None
 
     if norm_type == "batch":

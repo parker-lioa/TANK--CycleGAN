@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
+import torchvision
 from torchvision.utils import make_grid
 import argparse
 import time
@@ -20,8 +21,8 @@ def train(config):
     # define transform
 
     transform = transforms.Compose([
-        transforms.Resize((140, 140)),
-        transforms.RandomCrop((128, 128)),
+        transforms.Resize((300, 300)),
+        transforms.RandomCrop((256, 256)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([127.5], [127.5])
@@ -36,11 +37,22 @@ def train(config):
     # create model
 
     model = CycleGAN(config)
+
     if config.pre_train:
-        model.G1.load_state_dict(torch.load(config.pre_train_G1))
-        model.G2.load_state_dict(torch.load(config.pre_train_G2))
-        model.D1.load_state_dict(torch.load(config.pre_train_D1))
-        model.D2.load_state_dict(torch.load(config.pre_train_D2))
+        if torch.cuda.is_available():
+            model.G1.load_state_dict(torch.load(config.pre_train_G1))
+            model.G2.load_state_dict(torch.load(config.pre_train_G2))
+            model.D1.load_state_dict(torch.load(config.pre_train_D1))
+            model.D2.load_state_dict(torch.load(config.pre_train_D2))
+        else:
+            model.G1.load_state_dict(torch.load(
+                config.pre_train_G1, map_location=torch.device('cpu')))
+            model.G2.load_state_dict(torch.load(
+                config.pre_train_G2, map_location=torch.device('cpu')))
+            model.D1.load_state_dict(torch.load(
+                config.pre_train_D1, map_location=torch.device('cpu')))
+            model.D2.load_state_dict(torch.load(
+                config.pre_train_D2, map_location=torch.device('cpu')))
 
     # initialize SummaryWriter
 
@@ -53,6 +65,18 @@ def train(config):
         start_time = time.time()
 
         for imgA, imgB in dataloader:
+
+            # customized code -> rgb to grayscale
+
+            imgB = imgB.cpu()
+            imgB = [transforms.ToPILImage()(x) for x in imgB]
+            imgB = [transforms.Grayscale()(x) for x in imgB]
+            imgB = [transforms.ToTensor()(x) for x in imgB]
+            imgB = torch.stack(imgB)
+
+            cpu_or_gpu(imgB)
+
+            # end of customized section
 
             model.set_inputs(cpu_or_gpu(imgA), cpu_or_gpu(imgB))
 
@@ -114,7 +138,7 @@ if __name__ == '__main__':
     # model-parameters
 
     parser.add_argument('--A_dim', type=int, default=1)
-    parser.add_argument('--B_dim', type=int, default=3)
+    parser.add_argument('--B_dim', type=int, default=1)
 
     # hyper-parameters
 

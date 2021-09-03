@@ -36,6 +36,7 @@ class CycleGAN():
         self.D2 = define_D(in_dim=opt.A_dim, conv_dim=64,
                            norm_type="instance")  # judge input is A or not
 
+
         self.cycle_loss = torch.nn.L1Loss()
         self.idt_loss = torch.nn.L1Loss()
 
