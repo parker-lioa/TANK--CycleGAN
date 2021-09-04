@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torch.backends import cudnn
 from torchvision import transforms
 import torchvision
 from torchvision.utils import make_grid
@@ -32,7 +33,7 @@ def train(config):
 
     dataset = CycleGANDataSet(config.data_path1, config.data_path2, transform)
     dataloader = DataLoader(
-        dataset, batch_size=config.batch_size, shuffle=True)
+        dataset, batch_size=config.batch_size, shuffle=True, pin_memory=torch.cuda.is_available())
 
     # create model
 
@@ -120,6 +121,8 @@ def train(config):
 
 
 if __name__ == '__main__':
+
+    cudnn.benchmark = True
 
     parser = argparse.ArgumentParser()
 
