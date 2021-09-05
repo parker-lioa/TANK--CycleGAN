@@ -18,9 +18,9 @@ class CycleGANDataSet(Dataset):
         self.length = len(self.DomainA)
 
         self.img_A = [Image.open(
-            self.directory_A+'/'+self.DomainA[x]).copy() for x in self.DomainA]
+            self.directory_A+'/' + x).copy() for x in self.DomainA]
         self.img_B = [Image.open(
-            self.directory_B+'/'+self.DomainB[x]).copy() for x in self.DomainB]
+            self.directory_B+'/' + x).copy() for x in self.DomainB]
 
     def __getitem__(self, index):
 

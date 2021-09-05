@@ -4,6 +4,7 @@ import utils
 
 
 def conv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=True):
+
     layers = []
     layers.append(nn.Conv2d(c_in, c_out, k_size, stride, pad, bias=True))
     if bn:
@@ -16,6 +17,7 @@ def conv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=Tru
 
 
 def deconv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=True):
+
     layers = []
     layers.append(nn.ConvTranspose2d(
         c_in, c_out, k_size, stride, pad, bias=True))
@@ -29,6 +31,7 @@ def deconv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=T
 
 
 def residual(filter):
+
     layers = []
     layers.append(nn.Conv2d(filter, filter, 3, 1, 1, bias=True))
     layers.append(nn.BatchNorm2d(filter))
@@ -69,7 +72,6 @@ class Gen(nn.Module):
         self.residual1 = residual(conv_dim*2)
         self.residual2 = residual(conv_dim*2)
         self.residual3 = residual(conv_dim*2)
-        self.residual4 = residual(conv_dim*2)
 
         self.deconv1 = deconv(conv_dim*2, conv_dim, 4, bn=bn, ln=ln)
         self.deconv2 = deconv(conv_dim, out_dim, 4,

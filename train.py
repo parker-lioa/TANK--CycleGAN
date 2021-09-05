@@ -40,12 +40,16 @@ def train(config):
     model = CycleGAN(config)
 
     if config.pre_train:
+
         if torch.cuda.is_available():
+
             model.G1.load_state_dict(torch.load(config.pre_train_G1))
             model.G2.load_state_dict(torch.load(config.pre_train_G2))
             model.D1.load_state_dict(torch.load(config.pre_train_D1))
             model.D2.load_state_dict(torch.load(config.pre_train_D2))
+
         else:
+
             model.G1.load_state_dict(torch.load(
                 config.pre_train_G1, map_location=torch.device('cpu')))
             model.G2.load_state_dict(torch.load(
@@ -64,6 +68,9 @@ def train(config):
     for epoch in range(config.epochs):
 
         start_time = time.time()
+
+        g_loss = 0
+        d_loss = 0
 
         for imgA, imgB in dataloader:
 
@@ -86,6 +93,9 @@ def train(config):
             else:
                 model.optimize_parameters(only_D=True)
 
+            d_loss += model.d_loss.data
+            g_loss += model.g_loss.data
+
             # if torch.cuda.is_available():
             #     model.set_inputs(imgA.cuda(), imgB.cuda())
             # else:
@@ -93,10 +103,10 @@ def train(config):
             steps += 1
 
         print('Epoch:{}/{} in {} sec , loss_G: {} , loss_D: {}'.format(epoch+1,
-              config.epochs, time.time()-start_time, model.g_loss, model.d_loss))
+              config.epochs, time.time()-start_time, g_loss, d_loss))
 
         CycleGAN_tensorboard(writer, epoch+1, model.fake_A,
-                             model.fake_B, model.g_loss, model.d_loss)
+                             model.fake_B, g_loss, d_loss)
 
         # if (epoch+1) % 10 == 0:
         #     make_grid_and_save_image(
