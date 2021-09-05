@@ -2,6 +2,7 @@ import torch
 from torch import optim
 from torch.nn import init
 from torch.autograd import grad
+from torch.cuda.amp import autocast, GradScaler
 import numpy as np
 import os
 import time
@@ -23,6 +24,11 @@ class CycleGAN():
         self.idt_weight = opt.idt_weight
         self.lr = opt.lr
         self.clip = opt.clip_value
+        self.if_amp = opt.amp_train
+
+        if self.if_amp:
+
+            self.scaler = GradScaler()
 
         self.G1 = define_G(in_dim=opt.A_dim, out_dim=opt.B_dim,
                            conv_dim=64, norm_type="instance")  # generate fake B
@@ -36,7 +42,6 @@ class CycleGAN():
         self.D2 = define_D(in_dim=opt.A_dim, conv_dim=64,
                            norm_type="instance")  # judge input is A or not
 
-
         self.cycle_loss = torch.nn.L1Loss()
         self.idt_loss = torch.nn.L1Loss()
 
@@ -47,11 +52,13 @@ class CycleGAN():
         self.loss_option = opt.loss
 
         if opt.loss == 'lsgan':
+
             self.d_loss_function = torch.nn.MSELoss()
             self.g_loss_function = torch.nn.MSELoss()
             self.needlabel = True
 
         elif opt.loss == 'wgan':
+
             self.d_loss_function = torch.mean
             self.g_loss_function = torch.mean
             self.needlabel = False
@@ -147,7 +154,10 @@ class CycleGAN():
             self.g_loss = g1_adv_loss + g2_adv_loss + \
                 forward_cycle_loss + backward_cycle_loss
 
-        self.g_loss.backward()
+        if self.if_amp:
+            self.scaler.scale(self.g_loss).backward()
+        else:
+            self.g_loss.backward()
 
     def backward_D(self):
 
@@ -183,7 +193,10 @@ class CycleGAN():
 
             self.d_loss += d1_gradient_penalty + d2_gradient_penalty
 
-        self.d_loss.backward()
+        if self.if_amp:
+            self.scaler.scale(self.d_loss).backward()
+        else:
+            self.d_loss.backward()
 
     def weight_clip(self):
         for param in self.D1.parameters():
@@ -192,17 +205,44 @@ class CycleGAN():
             param.data.clamp_(-self.clip, self.clip)
 
     def optimize_parameters(self, only_D):
-        if only_D == False:
+
+        if self.if_amp:
+
+            if only_D == False:
+
+                with autocast():
+
+                    self.forward()
+                    set_requires_grad([self.D1, self.D2], requires_grad=False)
+                    self.g_optimizer.zero_grad()
+                    self.backward_G()
+
+                self.scaler.step(self.g_optimizer)
+                self.scaler.update()
+
+            with autocast():
+                set_requires_grad([self.D1, self.D2], True)
+                self.d_optimizer.zero_grad()
+                self.forward()
+                self.backward_D()
+
+            self.scaler.step(self.d_optimizer)
+            self.scaler.update()
+
+            if self.loss_option == 'wgan':
+                self.weight_clip()
+        else:
+            if only_D == False:
+
+                self.forward()
+                set_requires_grad([self.D1, self.D2], requires_grad=False)
+                self.g_optimizer.zero_grad()
+                self.backward_G()
+                self.g_optimizer.step()
+            set_requires_grad([self.D1, self.D2], True)
+            self.d_optimizer.zero_grad()
             self.forward()
-            # uneccesery when training G
-            set_requires_grad([self.D1, self.D2], requires_grad=False)
-            self.g_optimizer.zero_grad()
-            self.backward_G()
-            self.g_optimizer.step()
-        set_requires_grad([self.D1, self.D2], True)
-        self.d_optimizer.zero_grad()
-        self.forward()
-        self.backward_D()
-        self.d_optimizer.step()
-        if self.loss_option == 'wgan':
-            self.weight_clip()
+            self.backward_D()
+            self.d_optimizer.step()
+            if self.loss_option == 'wgan':
+                self.weight_clip()

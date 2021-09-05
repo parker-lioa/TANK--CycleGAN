@@ -84,7 +84,6 @@ class Gen(nn.Module):
         x = x + self.residual1(x)
         x = x + self.residual2(x)
         x = x + self.residual3(x)
-        x = x + self.residual4(x)
         x = self.deconv1(x)
         x = self.deconv2(x)
         x = nn.functional.tanh(x)

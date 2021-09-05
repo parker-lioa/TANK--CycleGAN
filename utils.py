@@ -7,6 +7,7 @@ from torch.nn import init
 
 
 def init_weight(m):
+
     classname = m.__class__.__name__
     if classname.find('conv') != -1 or classname.find('Linear') != -1:
         init.normal_(m.weight.data, 0.0, 0.2)
@@ -84,6 +85,7 @@ class ImagePool():
 
 
 def make_grid_and_save_image(tensor, path):
+
     grid_image = (torchvision.utils.make_grid(
         tensor, normalize=True)*255).cpu().numpy().astype(np.float32)
     grid_image = np.transpose(grid_image, (1, 2, 0))
@@ -91,10 +93,27 @@ def make_grid_and_save_image(tensor, path):
 
 
 def cpu_or_gpu(tensor):
+
     if torch.cuda.is_available():
         return tensor.cuda()
     else:
         return tensor
+
+
+def normalize_img(tensor):
+
+    max_num = torch.max(tensor)
+    min_num = torch.min(tensor)
+
+    difference = max_num - min_num
+    rate = 2/difference
+
+    tensor = rate * tensor
+    new_min = torch.min(tensor)
+
+    intercept = -1 - new_min
+
+    return tensor + intercept
 
 
 def Denormalize(tensor):
@@ -103,7 +122,7 @@ def Denormalize(tensor):
     max = torch.max(tensor)
 
     gap = max - min
-    deviation_rate = 255/gap
+    deviation_rate = 1/gap
 
     new_tensor = tensor * deviation_rate
     new_min = torch.min(new_tensor)
@@ -121,5 +140,5 @@ def CycleGAN_tensorboard(writer, epoch, fake_A, fake_B, lossG, lossD):
     fake_A_grid = torchvision.utils.make_grid(fake_A)
     fake_B_grid = torchvision.utils.make_grid(fake_B)
 
-    writer.add_image('Fake A', Denormalize(fake_A_grid), global_step=epoch+1)
-    writer.add_image('Fake B', Denormalize(fake_B_grid), global_step=epoch+1)
+    writer.add_image('Fake A', fake_A_grid, global_step=epoch+1)
+    writer.add_image('Fake B', fake_B_grid, global_step=epoch+1)

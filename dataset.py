@@ -1,13 +1,17 @@
+import torch
 from torch.utils.data.dataset import Dataset
+from torchvision import transforms
 from PIL import Image
+from utils import normalize_img
 import os
 
 
 class CycleGANDataSet(Dataset):
 
-    def __init__(self, directory_A, directory_B, transform):
+    def __init__(self, directory_A, directory_B, transform_A, transform_B):
 
-        self.transform = transform
+        self.transform_A = transform_A
+        self.transform_B = transform_B
         self.directory_A = directory_A
         self.directory_B = directory_B
         self.DomainA = os.listdir(directory_A)
@@ -27,9 +31,13 @@ class CycleGANDataSet(Dataset):
         img_A = self.img_A[index]
         img_B = self.img_B[index]
 
-        if self.transform is not None:
-            img_A = self.transform(img_A)
-            img_B = self.transform(img_B)
+        if self.transform_A is not None:
+            img_A = self.transform_A(img_A)
+        if self.transform_B is not None:
+            img_B = self.transform_B(img_B)
+
+        normalize_img(img_A)
+        normalize_img(img_B)
 
         return img_A, img_B
 

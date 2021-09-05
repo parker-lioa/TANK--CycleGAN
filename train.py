@@ -4,6 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.backends import cudnn
 from torchvision import transforms
 import torchvision
+from torchvision.transforms.transforms import Grayscale
 from torchvision.utils import make_grid
 import argparse
 import time
@@ -21,17 +22,24 @@ def train(config):
 
     # define transform
 
-    transform = transforms.Compose([
+    transform_A = transforms.Compose([
         transforms.Resize((300, 300)),
         transforms.RandomCrop((256, 256)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize([127.5], [127.5])
     ])
 
+    transform_B = transforms.Compose([
+        transforms.Grayscale(),
+        transforms.Resize((300, 300)),
+        transforms.RandomCrop((256, 256)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+    ])
     # load dataset
 
-    dataset = CycleGANDataSet(config.data_path1, config.data_path2, transform)
+    dataset = CycleGANDataSet(
+        config.data_path1, config.data_path2, transform_A, transform_B)
     dataloader = DataLoader(
         dataset, batch_size=config.batch_size, shuffle=True, pin_memory=torch.cuda.is_available())
 
@@ -74,27 +82,15 @@ def train(config):
 
         for imgA, imgB in dataloader:
 
-            # customized code -> rgb to grayscale
-
-            imgB = imgB.cpu()
-            imgB = [transforms.ToPILImage()(x) for x in imgB]
-            imgB = [transforms.Grayscale()(x) for x in imgB]
-            imgB = [transforms.ToTensor()(x) for x in imgB]
-            imgB = torch.stack(imgB)
-
-            cpu_or_gpu(imgB)
-
-            # end of customized section
-
             model.set_inputs(cpu_or_gpu(imgA), cpu_or_gpu(imgB))
 
-            if steps % 2 == 0:
+            if steps % 5 == 0:
                 model.optimize_parameters(only_D=False)
             else:
                 model.optimize_parameters(only_D=True)
 
-            d_loss += model.d_loss.data
-            g_loss += model.g_loss.data
+            d_loss += model.d_loss.item()
+            g_loss += model.g_loss.item()
 
             # if torch.cuda.is_available():
             #     model.set_inputs(imgA.cuda(), imgB.cuda())
@@ -136,6 +132,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
+    # special options
+
+    parser.add_argument('--amp_train', action='store_true')
+
     # path
 
     parser.add_argument('--model_path', type=str, default='.\models')
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     # hyper-parameters
 
     parser.add_argument('--epochs', type=int, default=10000)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=20)
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--loss', type=str, default='wgan-gp')
     parser.add_argument('--clip_value', type=float, default=0.01)
