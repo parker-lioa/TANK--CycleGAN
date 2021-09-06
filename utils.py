@@ -137,8 +137,18 @@ def CycleGAN_tensorboard(writer, epoch, fake_A, fake_B, lossG, lossD):
     writer.add_scalar("G-Loss/train", lossG, epoch+1)
     writer.add_scalar("D-loss", lossD, epoch+1)
 
-    fake_A_grid = torchvision.utils.make_grid(fake_A)
-    fake_B_grid = torchvision.utils.make_grid(fake_B)
+    if epoch % 10 == 0:
 
-    writer.add_image('Fake A', fake_A_grid, global_step=epoch+1)
-    writer.add_image('Fake B', fake_B_grid, global_step=epoch+1)
+        if fake_A.size()[0] > 16:
+
+            fake_A = torch.narrow(fake_A, 0, 0, 15)
+
+        if fake_B.size()[0] > 16:
+
+            fake_B = torch.narrow(fake_B, 0, 0, 15)
+
+        fake_A_grid = torchvision.utils.make_grid(Denormalize(fake_A), nrow=4)
+        fake_B_grid = torchvision.utils.make_grid(Denormalize(fake_B), nrow=4)
+
+        writer.add_image('Fake A', fake_A_grid, global_step=epoch+1)
+        writer.add_image('Fake B', fake_B_grid, global_step=epoch+1)
