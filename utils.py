@@ -137,9 +137,6 @@ def CycleGAN_tensorboard(writer, epoch, fake_A, fake_B, lossG, lossD):
     writer.add_scalar("G-Loss/train", lossG, epoch+1)
     writer.add_scalar("D-loss", lossD, epoch+1)
 
-    print(fake_A)
-    print(fake_B)
-
     if epoch % 10 == 0:
 
         if fake_A.size()[0] > 16:

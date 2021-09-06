@@ -33,10 +33,10 @@ def deconv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=T
 def residual(filter):
 
     layers = []
-    layers.append(nn.Conv2d(filter, filter, 3, 2, 1, bias=True))
+    layers.append(nn.Conv2d(filter, filter, 3, 1, 1, bias=True))
     layers.append(nn.BatchNorm2d(filter))
     layers.append(nn.LeakyReLU(0.02, inplace=True))
-    layers.append(nn.Conv2d(filter, filter, 3, 2, 1, bias=True))
+    layers.append(nn.Conv2d(filter, filter, 3, 1, 1, bias=True))
     layers.append(nn.BatchNorm2d(filter))
     return nn.Sequential(*layers)
 
