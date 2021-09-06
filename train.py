@@ -14,7 +14,7 @@ from PIL import Image
 
 from cycle_gan import CycleGAN
 from dataset import CycleGANDataSet
-from utils import make_grid_and_save_image, cpu_or_gpu, CycleGAN_tensorboard
+from utils import make_grid_and_save_image, cpu_or_gpu, CycleGAN_tensorboard, Denormalize
 import imageio
 
 
@@ -83,6 +83,9 @@ def train(config):
         for imgA, imgB in dataloader:
 
             model.set_inputs(cpu_or_gpu(imgA), cpu_or_gpu(imgB))
+
+            CycleGAN_tensorboard(writer, epoch+1, imgA,
+                                 imgB, g_loss, d_loss)
 
             if steps % 5 == 0:
                 model.optimize_parameters(only_D=False)

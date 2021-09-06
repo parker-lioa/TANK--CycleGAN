@@ -35,7 +35,7 @@ class CycleGANDataSet(Dataset):
             img_A = self.transform_A(img_A)
         if self.transform_B is not None:
             img_B = self.transform_B(img_B)
-
+            
         normalize_img(img_A)
         normalize_img(img_B)
 
