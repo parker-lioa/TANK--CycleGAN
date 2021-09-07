@@ -84,28 +84,23 @@ def train(config):
 
             model.set_inputs(cpu_or_gpu(imgA), cpu_or_gpu(imgB))
 
-            CycleGAN_tensorboard(writer, epoch+1, imgA,
-                                 imgB, g_loss, d_loss)
-
             if steps % 5 == 0:
+
                 model.optimize_parameters(only_D=False)
             else:
+
                 model.optimize_parameters(only_D=True)
 
             d_loss += model.d_loss.item()
             g_loss += model.g_loss.item()
 
-            # if torch.cuda.is_available():
-            #     model.set_inputs(imgA.cuda(), imgB.cuda())
-            # else:
-            #     model.set_inputs(imgA, imgB)
             steps += 1
-
-        print('Epoch:{}/{} in {} sec , loss_G: {} , loss_D: {}'.format(epoch+1,
-              config.epochs, time.time()-start_time, g_loss, d_loss))
 
         CycleGAN_tensorboard(writer, epoch+1, model.fake_A,
                              model.fake_B, g_loss, d_loss)
+
+        print('Epoch:{}/{} in {} sec , loss_G: {} , loss_D: {}'.format(epoch+1,
+              config.epochs, time.time()-start_time, g_loss, d_loss))
 
         # if (epoch+1) % 10 == 0:
         #     make_grid_and_save_image(
@@ -159,11 +154,11 @@ if __name__ == '__main__':
     # hyper-parameters
 
     parser.add_argument('--epochs', type=int, default=1000)
-    parser.add_argument('--batch_size', type=int, default=20)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--loss', type=str, default='wgan-gp')
     parser.add_argument('--clip_value', type=float, default=0.01)
-    parser.add_argument('--cycle_weight', type=float, default=20)
+    parser.add_argument('--cycle_weight', type=float, default=10)
     parser.add_argument('--idt_weight', type=float, default=0)
 
     config = parser.parse_args()

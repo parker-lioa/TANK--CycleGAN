@@ -16,11 +16,11 @@ def conv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=Tru
     return nn.Sequential(*layers)
 
 
-def deconv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=True):
+def deconv(c_in, c_out, k_size, stride=2, pad=1, output_padding=0, bn=True, ln=False, activation=True):
 
     layers = []
     layers.append(nn.ConvTranspose2d(
-        c_in, c_out, k_size, stride, pad, bias=True))
+        c_in, c_out, k_size, stride, pad, output_padding=output_padding, bias=True))
     if bn:
         layers.append(nn.BatchNorm2d(c_out))
     elif ln:
@@ -81,8 +81,8 @@ class Gen(nn.Module):
         self.residual8 = residual(conv_dim*4)
         self.residual9 = residual(conv_dim*4)
 
-        self.deconv1 = deconv(conv_dim*4, conv_dim*2, 3, bn=bn, ln=ln)
-        self.deconv2 = deconv(conv_dim*2, conv_dim, 3, bn=bn, ln=ln)
+        self.deconv1 = deconv(conv_dim*4, conv_dim*2, 3, 2, 1, 1, bn=bn, ln=ln)
+        self.deconv2 = deconv(conv_dim*2, conv_dim, 3, 2, 1, 1, bn=bn, ln=ln)
         self.deconv3 = deconv(conv_dim, out_dim, 7, 1, 3,
                               bn=False, ln=False, activation=False)
 
