@@ -84,7 +84,7 @@ def train(config):
 
             model.set_inputs(cpu_or_gpu(imgA), cpu_or_gpu(imgB))
 
-            if steps % 5 == 0:
+            if steps % 1 == 0:
 
                 model.optimize_parameters(only_D=False)
             else:
@@ -112,7 +112,7 @@ def train(config):
         #     make_grid_and_save_image(
         #         model.fake_A, config.log_path+'/fake_A'+'/fake_A_'+str(epoch+1)+'.png')
 
-        if (epoch+1) % 200 == 0:
+        if (epoch+1) % 250 == 0:
 
             torch.save(model.G1.state_dict(), config.model_path + '/G1' +
                        '/G1-'+str(epoch+1)+'.pkl')
