@@ -1,5 +1,11 @@
+import functools
+import math
+from collections import OrderedDict
+
 import torch
+import torchvision.utils
 from torch import optim
+from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import init
 from torch.autograd import grad
 from torch.cuda.amp import autocast, GradScaler
@@ -9,7 +15,7 @@ import time
 from PIL import Image
 
 from model import define_D, define_G
-from utils import set_requires_grad, ImagePool
+from utils import set_requires_grad, ImagePool, warmup_cosine
 
 
 # build model
@@ -25,9 +31,9 @@ class CycleGAN():
         self.lr = opt.lr
         self.clip = opt.clip_value
         self.if_amp = opt.amp_train
+        self.model_path = opt.model_path
 
         if self.if_amp:
-
             self.scaler = GradScaler()
 
         self.G1 = define_G(in_dim=opt.A_dim, out_dim=opt.B_dim,
@@ -45,11 +51,12 @@ class CycleGAN():
         self.cycle_loss = torch.nn.L1Loss()
         self.idt_loss = torch.nn.L1Loss()
 
-        self.fake_A_pool = ImagePool(opt.batch_size-1)
-        self.fake_B_pool = ImagePool(opt.batch_size-1)
+        self.fake_A_pool = ImagePool(50)
+        self.fake_B_pool = ImagePool(50)
 
         self.activate_gp = False
-        self.loss_option = opt.loss
+        self.loss = opt.loss
+        self.loss_names = ['g1', 'g2', 'idt1', 'idt2', 'cycle1', 'cycle2', 'd1', 'd2']
 
         if opt.loss == 'lsgan':
 
@@ -72,26 +79,30 @@ class CycleGAN():
         if opt.loss != 'wgan':
 
             self.g_optimizer = optim.Adam(
-                list(self.G1.parameters())+list(self.G2.parameters()), self.lr, betas=[0, 0.9])
+                list(self.G1.parameters()) + list(self.G2.parameters()), self.lr, betas=[0, 0.99])
 
             self.d_optimizer = optim.Adam(
-                list(self.D1.parameters())+list(self.D2.parameters()), self.lr, betas=[0, 0.9])
+                list(self.D1.parameters()) + list(self.D2.parameters()), self.lr, betas=[0, 0.99])
 
         elif opt.loss == 'wgan':
 
             self.g_optimizer = optim.RMSprop(
-                list(self.G1.parameters())+list(self.G2.parameters()), self.lr)
+                list(self.G1.parameters()) + list(self.G2.parameters()), self.lr)
 
             self.d_optimizer = optim.RMSprop(
-                list(self.D1.parameters())+list(self.D2.parameters()), self.lr)
+                list(self.D1.parameters()) + list(self.D2.parameters()), self.lr)
 
-    def set_inputs(self, domainA, domainB):
+        self.total_epoch = opt.epochs
+        lr_func = functools.partial(warmup_cosine, up_period=self.total_epoch * 0.1, y_intercept=1e-5, peak=self.lr,
+                                    total_period=self.total_epoch, alpha=0.2)
+
+        self.scheduler_g = LambdaLR(self.g_optimizer, lr_func)
+        self.scheduler_d = LambdaLR(self.d_optimizer, lr_func)
+
+    def forward(self, domainA, domainB):
 
         self.real_A = domainA
         self.real_B = domainB
-
-    def forward(self):
-
         self.fake_B = self.G1(self.real_A)
         self.rec_A = self.G2(self.fake_B)
         self.fake_A = self.G2(self.real_B)
@@ -104,7 +115,7 @@ class CycleGAN():
         else:
             alpha = torch.rand(real_data.size()[0], 1, 1, 1)
 
-        x_hat = alpha * real_data + (1-alpha) * fake_data
+        x_hat = alpha * real_data + (1 - alpha) * fake_data
         x_hat.requires_grad_(True)
 
         disc_out = Disc(x_hat)
@@ -128,121 +139,192 @@ class CycleGAN():
 
         if self.needlabel:
 
-            g1_adv_loss = self.g_loss_function(d1_out, torch.ones_like(d1_out))
-            g2_adv_loss = self.d_loss_function(d2_out, torch.ones_like(d2_out))
+            self.loss_g1 = self.g_loss_function(d1_out, torch.ones_like(d1_out))
+            self.loss_g2 = self.d_loss_function(d2_out, torch.ones_like(d2_out))
 
         else:
 
-            g1_adv_loss = - \
+            self.loss_g1 = - \
                 self.g_loss_function(d1_out.view(d1_out.size()[0], -1))
-            g2_adv_loss = - \
+            self.loss_g2 = - \
                 self.g_loss_function(d2_out.view(d2_out.size()[0], -1))
 
-        forward_cycle_loss = self.cycle_loss(
-            self.rec_A, self.real_A)*self.cycle_weight
-        backward_cycle_loss = self.cycle_loss(
-            self.rec_B, self.real_B)*self.cycle_weight
+        self.loss_cycle1 = self.cycle_loss(
+            self.rec_A, self.real_A) * self.cycle_weight
+        self.loss_cycle2 = self.cycle_loss(
+            self.rec_B, self.real_B) * self.cycle_weight
 
         if self.idt_weight > 0:
-            g1_idt_loss = self.idt_loss(
-                self.fake_B, self.real_A)*self.idt_weight
-            g2_idt_loss = self.idt_loss(
-                self.fake_A, self.real_B)*self.idt_weight
-            self.g_loss = g1_adv_loss + g2_adv_loss + forward_cycle_loss + \
-                backward_cycle_loss + g1_idt_loss + g2_idt_loss
+            self.loss_idt1 = self.idt_loss(
+                self.fake_B, self.real_A) * self.idt_weight
+            self.loss_idt2 = self.idt_loss(
+                self.fake_A, self.real_B) * self.idt_weight
         else:
-            self.g_loss = g1_adv_loss + g2_adv_loss + \
-                forward_cycle_loss + backward_cycle_loss
+            self.loss_idt1 = 0
+            self.loss_idt2 = 0
+
+        loss_g = self.loss_g1 + self.loss_g2 + self.loss_cycle1 + self.loss_cycle2 + self.loss_idt1 + self.loss_idt2
 
         if self.if_amp:
-            self.scaler.scale(self.g_loss).backward()
+            self.scaler.scale(loss_g).backward()
         else:
-            self.g_loss.backward()
+            loss_g.backward()
 
-    def backward_D(self):
+    def backward_basic_D(self, netD, real, fake):
 
-        d1_real_out = self.D1(self.real_B)
-        d2_real_out = self.D2(self.real_A)
-        d1_fake_out = self.D1(self.fake_B)
-        d2_fake_out = self.D2(self.fake_A)
+        real_score = netD(real)
+        fake_score = netD(fake.detach())
 
         if self.needlabel:
 
-            d1_loss = self.d_loss_function(d1_real_out, torch.ones_like(
-                d1_real_out)) + self.d_loss_function(d1_fake_out, torch.zeros_like(d1_fake_out))
-            d2_loss = self.d_loss_function(d2_real_out, torch.ones_like(
-                d2_real_out)) + self.d_loss_function(d2_fake_out, torch.zeros_like(d2_fake_out))
+            d_loss = self.d_loss_function(real_score, torch.ones_like(
+                real_score)) + self.d_loss_function(fake_score, torch.zeros_like(fake_score))
 
         else:
 
-            d1_loss = - \
-                self.d_loss_function(d1_real_out) + \
-                self.d_loss_function(d1_fake_out)
-            d2_loss = - \
-                self.d_loss_function(d2_real_out) + \
-                self.d_loss_function(d2_fake_out)
+            d_loss = -self.d_loss_function(real_score) + self.d_loss_function(fake_score)
 
-        self.d_loss = d1_loss + d2_loss
+        d_loss = d_loss * 0.5
 
         if self.activate_gp:
-
-            d2_gradient_penalty = self.gradient_penalty(
-                self.D2, self.real_A, self.fake_A)
-            d1_gradient_penalty = self.gradient_penalty(
-                self.D1, self.real_B, self.fake_B)
-
-            self.d_loss += d1_gradient_penalty + d2_gradient_penalty
+            gp_loss = self.gradient_penalty(netD, real, fake.detach())
+            d_loss += gp_loss
 
         if self.if_amp:
-            self.scaler.scale(self.d_loss).backward()
+            self.scaler.scale(d_loss).backward()
         else:
-            self.d_loss.backward()
+            d_loss.backward()
+
+        return d_loss
+
+    def backward_D1(self):
+
+        fake_B = self.fake_B_pool.query(self.fake_B)
+        self.loss_d1 = self.backward_basic_D(self.D1, self.real_B, fake_B)
+
+    def backward_D2(self):
+
+        fake_A = self.fake_A_pool.query(self.fake_A)
+        self.loss_d2 = self.backward_basic_D(self.D2, self.real_A, fake_A)
 
     def weight_clip(self):
+
         for param in self.D1.parameters():
             param.data.clamp_(-self.clip, self.clip)
         for param in self.D2.parameters():
             param.data.clamp_(-self.clip, self.clip)
 
-    def optimize_parameters(self, only_D):
+    def optimize_D(self):
+
+        set_requires_grad([self.D1, self.D2], True)
 
         if self.if_amp:
-
-            if only_D == False:
-
-                with autocast():
-
-                    self.forward()
-                    set_requires_grad([self.D1, self.D2], requires_grad=False)
-                    self.g_optimizer.zero_grad()
-                    self.backward_G()
-
-                self.scaler.step(self.g_optimizer)
-                self.scaler.update()
-
             with autocast():
-                set_requires_grad([self.D1, self.D2], True)
                 self.d_optimizer.zero_grad()
-                self.forward()
-                self.backward_D()
-
+                self.backward_D1()
+                self.backward_D2()
             self.scaler.step(self.d_optimizer)
             self.scaler.update()
-
-            if self.loss_option == 'wgan':
-                self.weight_clip()
         else:
-            if only_D == False:
+            self.d_optimizer.zero_grad()
+            self.backward_D1()
+            self.backward_D2()
+            self.d_optimizer.step()
 
-                self.forward()
-                set_requires_grad([self.D1, self.D2], requires_grad=False)
+        if self.loss == 'wgan':
+            self.weight_clip()
+
+    def optimize_G(self):
+
+        set_requires_grad([self.D1, self.D2], requires_grad=False)
+
+        if self.if_amp:
+            with autocast():
                 self.g_optimizer.zero_grad()
                 self.backward_G()
-                self.g_optimizer.step()
-            set_requires_grad([self.D1, self.D2], True)
-            self.d_optimizer.zero_grad()
-            self.forward()
-            self.backward_D()
-            self.d_optimizer.step()
-            if self.loss_option == 'wgan':
-                self.weight_clip()
+            self.scaler.step(self.g_optimizer)
+            self.scaler.update()
+
+        else:
+            self.g_optimizer.zero_grad()
+            self.backward_G()
+            self.g_optimizer.step()
+
+    def save_model(self, epoch):
+
+        torch.save(self.G1.state_dict(), self.model_path + 'G1-' + str(epoch) + '.pkl')
+        torch.save(self.G2.state_dict(), self.model_path + 'G2-' + str(epoch) + '.pkl')
+        torch.save(self.D1.state_dict(), self.model_path + 'D1-' + str(epoch) + '.pkl')
+        torch.save(self.D2.state_dict(), self.model_path + 'D2-' + str(epoch) + '.pkl')
+
+    def load_model(self, epoch=None):
+
+        if epoch is not None:
+
+            if torch.cuda.is_available():
+                self.G1.load_state_dict(torch.load(self.model_path + 'G1-' + str(epoch) + '.pkl'))
+                self.G2.load_state_dict(torch.load(self.model_path + 'G2-' + str(epoch) + '.pkl'))
+                self.D1.load_state_dict(torch.load(self.model_path + 'D1-' + str(epoch) + '.pkl'))
+                self.D2.load_state_dict(torch.load(self.model_path + 'D2-' + str(epoch) + '.pkl'))
+            else:
+                self.G1.load_state_dict(torch.load(self.model_path + 'G1-' + str(epoch) + '.pkl'),
+                                        map_location=torch.device('cpu'))
+                self.G2.load_state_dict(torch.load(self.model_path + 'G2-' + str(epoch) + '.pkl'),
+                                        map_location=torch.device('cpu'))
+                self.D1.load_state_dict(torch.load(self.model_path + 'D1-' + str(epoch) + '.pkl'),
+                                        map_location=torch.device('cpu'))
+                self.D2.load_state_dict(torch.load(self.model_path + 'D2-' + str(epoch) + '.pkl'),
+                                        map_location=torch.device('cpu'))
+        else:
+            if torch.cuda.is_available():
+                self.G1.load_state_dict(torch.load(self.model_path + 'G1' + '.pkl'))
+                self.G2.load_state_dict(torch.load(self.model_path + 'G2' + '.pkl'))
+                self.D1.load_state_dict(torch.load(self.model_path + 'D1' + '.pkl'))
+                self.D2.load_state_dict(torch.load(self.model_path + 'D2' + '.pkl'))
+            else:
+                self.G1.load_state_dict(torch.load(self.model_path + 'G1' + '.pkl'),
+                                        map_location=torch.device('cpu'))
+                self.G2.load_state_dict(torch.load(self.model_path + 'G2' + '.pkl'),
+                                        map_location=torch.device('cpu'))
+                self.D1.load_state_dict(torch.load(self.model_path + 'D1' + '.pkl'),
+                                        map_location=torch.device('cpu'))
+                self.D2.load_state_dict(torch.load(self.model_path + 'D2' + '.pkl'),
+                                        map_location=torch.device('cpu'))
+
+    def get_losses(self):
+
+        losses = OrderedDict()
+
+        for name in self.loss_names:
+            temp = getattr(self, 'loss_' + name)
+            if torch.is_tensor(temp):
+                losses[name] = temp.item()
+            else:
+                losses[name] = temp
+
+        return losses
+
+    def tensorboard_scalar_log(self, writer, step):
+
+        for name in self.loss_names:
+            temp = getattr(self, 'loss_' + name)
+            if torch.is_tensor(temp):
+                writer.add_scalar(name, temp.item())
+            else:
+                writer.add_scalar(name, temp)
+
+    def tensorboard_image_log(self, writer, epoch, sample_number):
+
+        sample_a = self.fake_A_pool.sample(sample_number)
+        sample_b = self.fake_B_pool.sample(sample_number)
+
+        grid_a = torchvision.utils.make_grid(sample_a, nrow=math.floor(math.sqrt(sample_number)), normalize=True)
+        grid_b = torchvision.utils.make_grid(sample_b, nrow=math.floor(math.sqrt(sample_number)), normalize=True)
+
+        writer.add_image('Fake A', grid_a, global_step=epoch)
+        writer.add_image('Fake B', grid_b, global_step=epoch)
+
+    def update_lr(self):
+
+        self.scheduler_g.step()
+        self.scheduler_d.step()
