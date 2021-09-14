@@ -20,7 +20,7 @@ from utils import set_requires_grad, ImagePool, warmup_cosine
 
 # build model
 
-class CycleGAN():
+class CycleGAN:
 
     def __init__(self, opt):
 
@@ -96,8 +96,8 @@ class CycleGAN():
         lr_func = functools.partial(warmup_cosine, up_period=self.total_epoch * 0.1, y_intercept=1e-5, peak=self.lr,
                                     total_period=self.total_epoch, alpha=0.2)
 
-        self.scheduler_g = LambdaLR(self.g_optimizer, lr_func)
-        self.scheduler_d = LambdaLR(self.d_optimizer, lr_func)
+        # self.scheduler_g = LambdaLR(self.g_optimizer, lr_func)
+        # self.scheduler_d = LambdaLR(self.d_optimizer, lr_func)
 
     def forward(self, domainA, domainB):
 
@@ -252,10 +252,10 @@ class CycleGAN():
 
     def save_model(self, epoch):
 
-        torch.save(self.G1.state_dict(), self.model_path + 'G1-' + str(epoch) + '.pkl')
-        torch.save(self.G2.state_dict(), self.model_path + 'G2-' + str(epoch) + '.pkl')
-        torch.save(self.D1.state_dict(), self.model_path + 'D1-' + str(epoch) + '.pkl')
-        torch.save(self.D2.state_dict(), self.model_path + 'D2-' + str(epoch) + '.pkl')
+        torch.save(self.G1.state_dict(), self.model_path + '/G1-' + str(epoch) + '.pkl')
+        torch.save(self.G2.state_dict(), self.model_path + '/G2-' + str(epoch) + '.pkl')
+        torch.save(self.D1.state_dict(), self.model_path + '/D1-' + str(epoch) + '.pkl')
+        torch.save(self.D2.state_dict(), self.model_path + '/D2-' + str(epoch) + '.pkl')
 
     def load_model(self, epoch=None):
 
@@ -328,3 +328,6 @@ class CycleGAN():
 
         self.scheduler_g.step()
         self.scheduler_d.step()
+
+    def get_lr(self):
+        return self.scheduler_d.get_last_lr()

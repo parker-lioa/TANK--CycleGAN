@@ -5,7 +5,7 @@ import utils
 
 def conv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=True):
     layers = []
-    layers.append(nn.Conv2d(c_in, c_out, k_size, stride, pad, bias=False))
+    layers.append(nn.Conv2d(c_in, c_out, k_size, stride, pad, bias=not bn))
     if bn:
         layers.append(nn.BatchNorm2d(c_out))
     elif ln:
@@ -18,7 +18,7 @@ def conv(c_in, c_out, k_size, stride=2, pad=1, bn=True, ln=False, activation=Tru
 def deconv(c_in, c_out, k_size, stride=2, pad=1, output_padding=0, bn=True, ln=False, activation=True):
     layers = []
     layers.append(nn.ConvTranspose2d(
-        c_in, c_out, k_size, stride, pad, output_padding=output_padding, bias=False))
+        c_in, c_out, k_size, stride, pad, output_padding=output_padding, bias=not bn))
     if bn:
         layers.append(nn.BatchNorm2d(c_out))
     elif ln:

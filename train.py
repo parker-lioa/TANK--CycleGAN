@@ -52,7 +52,7 @@ def train(config):
 
     # initialize SummaryWriter
 
-    writer = SummaryWriter(log_dir=config.log_path)
+    writer = SummaryWriter()
 
     steps = 0
 
@@ -84,7 +84,8 @@ def train(config):
             progress_bar.set_description(loss_description)
             model.tensorboard_scalar_log(writer, steps)
 
-        model.update_lr()
+        # model.update_lr()
+        # print(model.get_lr())
 
         if epoch % config.save_image_period == 0:
             model.tensorboard_image_log(writer, epoch, sample_number=16)
@@ -120,10 +121,10 @@ if __name__ == '__main__':
 
     # hyper-parameters
 
-    parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--epochs', type=int, default=10000)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=0.0001)
-    parser.add_argument('--loss', type=str, default='wgan-gp')
+    parser.add_argument('--loss', type=str, default='lsgan')
     parser.add_argument('--n_critic', type=int, default=1)
     parser.add_argument('--clip_value', type=float, default=0.01)
     parser.add_argument('--cycle_weight', type=float, default=10)
