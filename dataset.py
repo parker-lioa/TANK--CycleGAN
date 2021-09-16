@@ -5,7 +5,6 @@ from PIL import Image
 from utils import normalize_img
 import os
 import glob
-import labelme
 
 
 class CycleGANDataSet(Dataset):

@@ -75,7 +75,7 @@ def train(config):
             model.tensorboard_image_log(writer, epoch, sample_number=16)
 
         if epoch % config.save_period == 0:
-            model.save_model(epoch, config.model_path)
+            model.save_model(config.model_path,epoch)
 
 
 if __name__ == '__main__':
