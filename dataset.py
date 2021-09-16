@@ -28,6 +28,7 @@ class CycleGANDataSet(Dataset):
 
         self.directory_A = directory_A
         self.directory_B = directory_B
+
         self.DomainA = os.listdir(directory_A)
         self.DomainB = os.listdir(directory_B)
 

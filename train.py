@@ -19,7 +19,6 @@ from options import train_opt
 
 
 def train(config):
-
     # load dataset
 
     dataset = CycleGANDataSet(
@@ -60,7 +59,7 @@ def train(config):
 
             steps += 1
 
-            loss_description = ''
+            loss_description = 'Epoch: %s/%s ' % (epoch, config.epochs)
             losses = model.get_losses()
 
             for loss_key in losses:
@@ -76,7 +75,7 @@ def train(config):
             model.tensorboard_image_log(writer, epoch, sample_number=16)
 
         if epoch % config.save_period == 0:
-            model.save_model(epoch)
+            model.save_model(epoch, config.model_path)
 
 
 if __name__ == '__main__':
