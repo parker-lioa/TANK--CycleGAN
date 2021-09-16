@@ -108,14 +108,14 @@ class CycleGAN:
         self.fake_A = self.G2(self.real_B)
         self.rec_B = self.G1(self.fake_A)
 
-    def gradient_penalty(self, Disc, real_data, fake_data):
+    def gradient_penalty(self, Disc, real_image, fake_image):
 
         if torch.cuda.is_available():
-            alpha = torch.rand(real_data.size()[0], 1, 1, 1).cuda()
+            alpha = torch.rand(real_image.size()[0], 1, 1, 1).cuda()
         else:
-            alpha = torch.rand(real_data.size()[0], 1, 1, 1)
+            alpha = torch.rand(real_image.size()[0], 1, 1, 1)
 
-        x_hat = alpha * real_data + (1 - alpha) * fake_data
+        x_hat = alpha * real_image + (1 - alpha) * fake_image
         x_hat.requires_grad_(True)
 
         disc_out = Disc(x_hat)
@@ -250,46 +250,46 @@ class CycleGAN:
             self.backward_G()
             self.g_optimizer.step()
 
-    def save_model(self, epoch):
+    def save_model(self, model_path, epoch):
 
-        torch.save(self.G1.state_dict(), self.model_path + '/G1-' + str(epoch) + '.pkl')
-        torch.save(self.G2.state_dict(), self.model_path + '/G2-' + str(epoch) + '.pkl')
-        torch.save(self.D1.state_dict(), self.model_path + '/D1-' + str(epoch) + '.pkl')
-        torch.save(self.D2.state_dict(), self.model_path + '/D2-' + str(epoch) + '.pkl')
+        torch.save(self.G1.state_dict(), model_path + '/G1-' + str(epoch) + '.pkl')
+        torch.save(self.G2.state_dict(), model_path + '/G2-' + str(epoch) + '.pkl')
+        torch.save(self.D1.state_dict(), model_path + '/D1-' + str(epoch) + '.pkl')
+        torch.save(self.D2.state_dict(), model_path + '/D2-' + str(epoch) + '.pkl')
 
-    def load_model(self, epoch=None):
+    def load_model(self, model_path, epoch=None):
 
         if epoch is not None:
 
             if torch.cuda.is_available():
-                self.G1.load_state_dict(torch.load(self.model_path + 'G1-' + str(epoch) + '.pkl'))
-                self.G2.load_state_dict(torch.load(self.model_path + 'G2-' + str(epoch) + '.pkl'))
-                self.D1.load_state_dict(torch.load(self.model_path + 'D1-' + str(epoch) + '.pkl'))
-                self.D2.load_state_dict(torch.load(self.model_path + 'D2-' + str(epoch) + '.pkl'))
+                self.G1.load_state_dict(torch.load(model_path + '/G1-' + str(epoch) + '.pkl'))
+                self.G2.load_state_dict(torch.load(model_path + '/G2-' + str(epoch) + '.pkl'))
+                self.D1.load_state_dict(torch.load(model_path + '/D1-' + str(epoch) + '.pkl'))
+                self.D2.load_state_dict(torch.load(model_path + '/D2-' + str(epoch) + '.pkl'))
             else:
-                self.G1.load_state_dict(torch.load(self.model_path + 'G1-' + str(epoch) + '.pkl'),
-                                        map_location=torch.device('cpu'))
-                self.G2.load_state_dict(torch.load(self.model_path + 'G2-' + str(epoch) + '.pkl'),
-                                        map_location=torch.device('cpu'))
-                self.D1.load_state_dict(torch.load(self.model_path + 'D1-' + str(epoch) + '.pkl'),
-                                        map_location=torch.device('cpu'))
-                self.D2.load_state_dict(torch.load(self.model_path + 'D2-' + str(epoch) + '.pkl'),
-                                        map_location=torch.device('cpu'))
+                self.G1.load_state_dict(
+                    torch.load(model_path + '/G1-' + str(epoch) + '.pkl', map_location=torch.device('cpu')))
+                self.G2.load_state_dict(torch.load(model_path + '/G2-' + str(epoch) + '.pkl',
+                                                   map_location=torch.device('cpu')))
+                self.D1.load_state_dict(torch.load(model_path + '/D1-' + str(epoch) + '.pkl',
+                                                   map_location=torch.device('cpu')))
+                self.D2.load_state_dict(torch.load(model_path + '/D2-' + str(epoch) + '.pkl',
+                                                   map_location=torch.device('cpu')))
         else:
             if torch.cuda.is_available():
-                self.G1.load_state_dict(torch.load(self.model_path + 'G1' + '.pkl'))
-                self.G2.load_state_dict(torch.load(self.model_path + 'G2' + '.pkl'))
-                self.D1.load_state_dict(torch.load(self.model_path + 'D1' + '.pkl'))
-                self.D2.load_state_dict(torch.load(self.model_path + 'D2' + '.pkl'))
+                self.G1.load_state_dict(torch.load(model_path + '/G1' + '.pkl'))
+                self.G2.load_state_dict(torch.load(model_path + '/G2' + '.pkl'))
+                self.D1.load_state_dict(torch.load(model_path + '/D1' + '.pkl'))
+                self.D2.load_state_dict(torch.load(model_path + '/D2' + '.pkl'))
             else:
-                self.G1.load_state_dict(torch.load(self.model_path + 'G1' + '.pkl'),
-                                        map_location=torch.device('cpu'))
-                self.G2.load_state_dict(torch.load(self.model_path + 'G2' + '.pkl'),
-                                        map_location=torch.device('cpu'))
-                self.D1.load_state_dict(torch.load(self.model_path + 'D1' + '.pkl'),
-                                        map_location=torch.device('cpu'))
-                self.D2.load_state_dict(torch.load(self.model_path + 'D2' + '.pkl'),
-                                        map_location=torch.device('cpu'))
+                self.G1.load_state_dict(torch.load(model_path + '/G1' + '.pkl',
+                                                   map_location=torch.device('cpu')))
+                self.G2.load_state_dict(torch.load(model_path + '/G2' + '.pkl',
+                                                   map_location=torch.device('cpu')))
+                self.D1.load_state_dict(torch.load(model_path + '/D1' + '.pkl',
+                                                   map_location=torch.device('cpu')))
+                self.D2.load_state_dict(torch.load(model_path + '/D2' + '.pkl',
+                                                   map_location=torch.device('cpu')))
 
     def get_losses(self):
 
@@ -309,9 +309,9 @@ class CycleGAN:
         for name in self.loss_names:
             temp = getattr(self, 'loss_' + name)
             if torch.is_tensor(temp):
-                writer.add_scalar(name, temp.item())
+                writer.add_scalar(name, temp.item(), step)
             else:
-                writer.add_scalar(name, temp)
+                writer.add_scalar(name, temp, step)
 
     def tensorboard_image_log(self, writer, epoch, sample_number):
 
@@ -331,3 +331,15 @@ class CycleGAN:
 
     def get_lr(self):
         return self.scheduler_d.get_last_lr()
+
+    def eval(self, real_A, real_B):
+
+        set_requires_grad([self.D1, self.D2, self.G1, self.G2], requires_grad=False)
+
+        fake_A = self.G2(real_B)
+        fake_B = self.G1(real_A)
+
+        rec_A = self.G2(fake_A)
+        rec_B = self.G1(fake_B)
+
+        return (fake_A, fake_B, rec_A, rec_B)
